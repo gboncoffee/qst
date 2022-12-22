@@ -6,9 +6,22 @@ pub struct Config {
     pub max_threads: Option<usize>,
     pub default_file: String,
     pub err404_file: Option<String>,
+    pub limit_requests: Option<usize>,
 }
 
 impl Config {
+
+    /// Creates a new default config.
+    pub fn new() -> Config {
+        Config {
+            port: String::from("6969"),
+            addr: String::from("127.0.0.1"),
+            max_threads: None,
+            default_file: String::from("index.html"),
+            err404_file: None,
+            limit_requests: None,
+        }
+    }
 
     fn set_option(&mut self, arg: String, value: String) -> Result<(), String> {
         match &arg[..] {
@@ -29,6 +42,15 @@ impl Config {
                     Ok(n) => self.max_threads = Some(n),
                 };
             },
+            "--limit-requests" | "-l" => {
+                match value.to_string().parse::<usize>() {
+                    Err(_) => {
+                        let msg = format!("{value} is not a valid number!");
+                        return Err(msg);
+                    },
+                    Ok(n) => self.limit_requests = Some(n),
+                }
+            }
             other => {
                 let msg = format!("No such option: {other}");
                 return Err(msg);
@@ -51,13 +73,7 @@ impl Config {
     /// });
     /// ```
     pub fn build_from_cmdline(mut args: impl Iterator<Item = String>) -> Result<Config, String> {
-        let mut config = Config {
-            port: String::from("127.0.0.1"),
-            addr: String::from("6969"),
-            max_threads: None,
-            default_file: String::from("index.html"),
-            err404_file: None,
-        };
+        let mut config = Config::new();
 
         if args.next().is_none() {
             return Ok(config);
@@ -98,6 +114,8 @@ mod tests {
             String::from("home.html"),
             String::from("--err404-file"),
             String::from("404.html"),
+            String::from("--limit-requests"),
+            String::from("4"),
         ];
         let args = vec_args.iter().map(|s| s.to_string());
         let config = match Config::build_from_cmdline(args) {
@@ -110,6 +128,7 @@ mod tests {
             max_threads: Some(8),
             default_file: String::from("home.html"),
             err404_file: Some(String::from("404.html")),
+            limit_requests: Some(4),
         });
     }
 
@@ -121,13 +140,7 @@ mod tests {
             Ok(config) => config,
             Err(msg) => panic!("Tried valid empty config, got {msg} instead"),
         };
-        assert_eq!(config, Config {
-            port: String::from("127.0.0.1"),
-            addr: String::from("6969"),
-            max_threads: None,
-            default_file: String::from("index.html"),
-            err404_file: None,
-        });
+        assert_eq!(config, Config::new());
     }
 
     #[test]
@@ -138,12 +151,6 @@ mod tests {
             Ok(config) => config,
             Err(msg) => panic!("Tried valid empty config, got {msg} instead"),
         };
-        assert_eq!(config, Config {
-            port: String::from("127.0.0.1"),
-            addr: String::from("6969"),
-            max_threads: None,
-            default_file: String::from("index.html"),
-            err404_file: None,
-        });
+        assert_eq!(config, Config::new());
     }
 }
