@@ -5,9 +5,9 @@ use config::Config;
 // use http::*;
 use std::io::Result as IoResult;
 use std::{
-    fs,
-    thread,
-    sync::mpsc,
+    // fs,
+    // thread,
+    // sync::mpsc,
     net::{TcpListener, TcpStream},
     io::{
         // prelude::*,
@@ -124,6 +124,7 @@ mod tests {
     use super::*;
     use std::process;
     use std::time::Duration;
+    use std::{sync::mpsc, thread};
     
     #[test]
     fn server_starts_and_quit_with_limit_0() {
