@@ -223,14 +223,15 @@ impl ToString for HttpResponseCode {
 }
 
 pub struct HttpRequest {
-    pub content: String,
+    pub content: Option<String>,
     pub method: HttpMethod,
     pub fetch: String,
-    pub headers: HashMap<String, String>,
+    pub headers: Option<HashMap<String, String>>,
+}
 }
 
 pub struct HttpResponse {
-    pub content: String,
+    pub content: Option<String>,
     pub code: HttpResponseCode,
-    pub headers: HashMap<String, String>,
+    pub headers: Option<HashMap<String, String>>,
 }
