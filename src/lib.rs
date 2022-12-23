@@ -122,7 +122,6 @@ pub fn start_server(config: Config) -> Result<(), String> {
 mod tests {
     
     use super::*;
-    use std::process;
     use std::time::Duration;
     use std::{sync::mpsc, thread};
     
@@ -135,15 +134,18 @@ mod tests {
 
         thread::spawn(move || {
             match start_server(config) {
-                Ok(()) => process::exit(0),
-                Err(msg) => tx.send(msg).unwrap(),
+                Ok(()) => tx.send(Ok(())).unwrap(),
+                Err(msg) => tx.send(Err(msg)).unwrap(),
             };
         });
 
-        thread::sleep(Duration::from_secs(5));
-        match rx.try_recv() {
-            Ok(msg) => panic!("Server crashed with message {msg}."),
-            Err(_) => panic!("Server did not stop within the 5 second timeout."),
-        };
+        for _ in 0..1000 {
+            thread::sleep(Duration::from_millis(5));
+            match rx.try_recv() {
+                Ok(Ok(_)) => break,
+                Ok(Err(msg)) => panic!("Server crashed with message {msg}."),
+                Err(_) => panic!("Server did not stop within the 5 second timeout."),
+            };
+        }
     }
 }
