@@ -103,6 +103,30 @@ impl HttpResponse {
             content_length: None,
         }
     }
+
+    pub fn to_string(&self) -> String {
+        // add statusline
+        let mut http_response = String::from("HTTP/1.1 ");
+        http_response.push_str(&self.code.to_string()[..]);
+        http_response.push('\r');
+        http_response.push('\n');
+
+        // add content_length if applicable
+        if let Some(length) = self.content_length {
+            http_response.push_str(&format!("Content-Length: {length}\r\n\r\n")[..])
+        }
+
+        // add content if applicable
+        if let Some(content) = &self.content {
+            http_response.push_str(&format!("{content}\r\n")[..]);
+        }
+
+        // end and return response
+        http_response.push('\r');
+        http_response.push('\n');
+
+        http_response
+    }
 }
 
 #[cfg(test)]
@@ -180,5 +204,50 @@ mod tests {
             content: None,
             content_length: None,
         });
+    }
+
+    #[test]
+    fn response_to_string_creates_correct_responses() {
+        let response = HttpResponse {
+            code: HttpResponseCode::NotFound404,
+            content: None,
+            content_length: None,
+        };
+        assert_eq!(response.to_string(), "HTTP/1.1 404 Not Found\r\n\r\n");
+
+        let response = HttpResponse::bad_request_400();
+        assert_eq!(response.to_string(), "HTTP/1.1 400 Bad Request\r\n\r\n");
+
+        let content = "\
+<!DOCTYPE html>
+<html>
+    <head>
+    </head>
+    <body>
+        Hello, World!
+    </body>
+</html>
+";
+        let response = HttpResponse {
+            code: HttpResponseCode::OK200,
+            content: Some(String::from(content)),
+            content_length: Some(content.len()),
+        };
+
+        assert_eq!(response.to_string(), String::from("\
+HTTP/1.1 200 Ok\r
+Content-Length: 99\r
+\r
+<!DOCTYPE html>
+<html>
+    <head>
+    </head>
+    <body>
+        Hello, World!
+    </body>
+</html>
+\r
+\r
+"));
     }
 }
