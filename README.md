@@ -6,6 +6,12 @@ instant startup.
 **DISCLAIMER**: THIS IS NOT MEANT FOR PRODUCTION. THE EXPECTED USE CASE FOR THIS
 SOFTWARE IS TO HELP THE DEVELOPMENT OF STATIC WEB PAGES, NOT FOR PRODUCTION.
 
+## Installing
+
+Install from [crates.io](https://crates.io/crates/qst):
+
+`cargo install qst`
+
 ## Usage
 
 `qst` have this cli args:
