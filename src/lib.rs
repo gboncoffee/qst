@@ -173,7 +173,7 @@ pub fn start_server(config: Config) -> Result<(), String> {
     if let Some(limit) = config.limit_requests {
         let mut count = 0;
         serve(config, move || {
-            if count < limit {
+            if count <= limit {
                 count += 1;
                 match iter.next() {
                     Some(result_stream) => match result_stream {
