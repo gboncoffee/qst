@@ -5,24 +5,72 @@ use config::Config;
 use http::*;
 use std::io::Result as IoResult;
 use std::{
-    // fs,
+    fs,
     thread,
     process,
     net::{TcpListener, TcpStream},
-    io::{
-        // prelude::*,
-        BufReader
-    },
+    io::Write,
 };
 
-pub fn respond_http_request(mut stream: TcpStream) {
-    let _buf_reader = BufReader::new(&mut stream);
-    todo!();
 static mut THREAD_COUNT: isize = 0;
+
+fn write_tcp_or_bail_out(mut stream: TcpStream, string: String) {
+    stream.write_all(string.as_bytes()).unwrap_or_else(|_| {
+        eprintln!("Fatal server error: Cannot write to TCP Stream. Bailing out. You're on your own. Good luck.");
+        process::exit(1);
+    });
 }
 
-pub fn new_connection(stream: TcpStream) {
-    todo!();
+pub fn respond_http_request(mut stream: TcpStream, default_file: String, err404_file: Option<String>) {
+    match HttpRequest::parse_tcp_stream(&mut stream) {
+        Ok(request) => {
+            match request.match_fetch(&default_file[..]) {
+                Ok(fetch) => {
+                    let mut count = fetch.chars();
+                    count.next().unwrap(); // will never panic as fetch is always ./<stuff>
+                    count.next().unwrap();
+                    if count.next().unwrap() == '_' {
+                        write_tcp_or_bail_out(stream, HttpResponse {
+                            code: HttpResponseCode::Forbbiden403,
+                            content: None,
+                            content_length: None,
+                        }.to_string());
+                        return;
+                    }
+
+                    // actually read the file and send it
+                    if let IoResult::Ok(content) = fs::read_to_string(fetch) {
+                        let len = content.len();
+                        write_tcp_or_bail_out(stream, HttpResponse {
+                            code: HttpResponseCode::OK200,
+                            content: Some(content),
+                            content_length: Some(len),
+                        }.to_string());
+                    } else {
+                        let (content, length) = match err404_file {
+                            // if the file is valid, uses it, else fails silently
+                            Some(file) => {
+                                if let IoResult::Ok(string) = fs::read_to_string(file) {
+                                    let len = string.len();
+                                    (Some(string), Some(len))
+                                } else {
+                                    (None, None)
+                                }
+                            },
+                            None => (None, None),
+                        };
+                        write_tcp_or_bail_out(stream, HttpResponse {
+                            code: HttpResponseCode::NotFound404,
+                            content: content,
+                            content_length: length,
+                        }.to_string());
+                    }
+                },
+                Err(response) => write_tcp_or_bail_out(stream, response.to_string()),
+            }
+        },
+        Err(response) => write_tcp_or_bail_out(stream, response.to_string()),
+    }
 }
 
 /// Server main loop. Receives a config and a `incoming` function that must return
@@ -76,9 +124,16 @@ pub fn serve<F>(config: Config, mut incoming: F) -> Result<(), String>
                 unsafe {
                     THREAD_COUNT += 1;
                 }
+
+                let default_file = config.default_file.clone();
+                let err404_file = match config.err404_file {
+                    Some(ref file) => Some(file.clone()),
+                    None => None,
+                };
+
                 if thread::Builder::new()
                     .spawn(move || {
-                        respond_http_request(stream);
+                        respond_http_request(stream, default_file, err404_file);
                         unsafe { THREAD_COUNT -= 1; }
                     })
                     .is_err()

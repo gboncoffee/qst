@@ -81,9 +81,50 @@ impl HttpRequest {
         Ok(HttpRequest { method, fetch })
     }
 
-    pub fn parse_tcp_stream(mut stream: TcpStream) -> Result<HttpRequest, HttpResponse> {
-        let stream_reader = BufReader::new(&mut stream);
+    pub fn parse_tcp_stream(stream: &mut TcpStream) -> Result<HttpRequest, HttpResponse> {
+        let stream_reader = BufReader::new(stream);
         HttpRequest::parse_from_lines_iterator(stream_reader.lines())
+    }
+
+    /// Returns the correct path to fetch based on the fetch from a request. Will always be based
+    /// uppon the current working directory, starting with `./`.
+    ///
+    /// If the path is impossible or insecure in a Linux system (i.e., contains "..", "//", or ends
+    /// with "/"), returns Err with a proper response to that.
+    ///
+    /// If the fetch is `/`, returns `./index.html`.
+    ///
+    /// # Examples:
+    /// ```
+    /// use qst::http::*;
+    /// let request = HttpRequest {
+    ///     method: HttpMethod::GET,
+    ///     fetch: String::from("/"),
+    /// };
+    /// assert_eq!("./index.html", HttpRequest::match_fetch(&request, "index.html").unwrap());
+    /// ```
+    pub fn match_fetch(&self, default: &str) -> Result<String, HttpResponse> {
+        if self.fetch == "/" {
+            Ok(format!("./{default}"))
+
+        } else if 
+            self.fetch.find("//").is_some() ||
+            self.fetch.find("..").is_some() ||
+            self.fetch.ends_with('/')
+        {
+            Err(HttpResponse {
+                code: HttpResponseCode::Forbbiden403,
+                content: None,
+                content_length: None,
+            })
+
+        } else {
+            if self.fetch.starts_with('/') {
+                Ok(format!(".{}", self.fetch))
+            } else {
+                Ok(format!("./{}", self.fetch))
+            }
+        }
     }
 }
 
@@ -103,8 +144,10 @@ impl HttpResponse {
             content_length: None,
         }
     }
+}
 
-    pub fn to_string(&self) -> String {
+impl ToString for HttpResponse {
+    fn to_string(&self) -> String {
         // add statusline
         let mut http_response = String::from("HTTP/1.1 ");
         http_response.push_str(&self.code.to_string()[..]);
@@ -249,5 +292,36 @@ Content-Length: 99\r
 \r
 \r
 "));
+    }
+
+    #[test]
+    fn http_request_matches_fetch() {
+        let forbidden_res = Err(HttpResponse {
+            code: HttpResponseCode::Forbbiden403,
+            content: None,
+            content_length: None,
+        });
+
+        let mut request = HttpRequest {
+            method: HttpMethod::GET,
+            fetch: String::from("/"),
+        };
+
+        assert_eq!(Ok(String::from("./index.html")), request.match_fetch("index.html"));
+
+        request.fetch = String::from("/test.js");
+        assert_eq!(Ok(String::from("./test.js")), request.match_fetch("index.html"));
+
+        request.fetch = String::from("stuff.css");
+        assert_eq!(Ok(String::from("./stuff.css")), request.match_fetch("index.html"));
+
+        request.fetch = String::from("../not_allow.png");
+        assert_eq!(forbidden_res, request.match_fetch("index.html"));
+
+        request.fetch = String::from("/not//allow.jpg");
+        assert_eq!(forbidden_res, request.match_fetch("index.html"));
+
+        request.fetch = String::from("not_allow/");
+        assert_eq!(forbidden_res, request.match_fetch("index.html"));
     }
 }
