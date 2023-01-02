@@ -2,12 +2,12 @@ pub mod config;
 pub mod http;
 
 use config::Config;
-// use http::*;
+use http::*;
 use std::io::Result as IoResult;
 use std::{
     // fs,
-    // thread,
-    // sync::mpsc,
+    thread,
+    process,
     net::{TcpListener, TcpStream},
     io::{
         // prelude::*,
@@ -18,6 +18,7 @@ use std::{
 pub fn respond_http_request(mut stream: TcpStream) {
     let _buf_reader = BufReader::new(&mut stream);
     todo!();
+static mut THREAD_COUNT: isize = 0;
 }
 
 pub fn new_connection(stream: TcpStream) {
@@ -58,8 +59,33 @@ pub fn serve<F>(config: Config, mut incoming: F) -> Result<(), String>
         F: FnMut() -> Result<Option<TcpStream>, String>,
 {
     loop {
-        let stream = match incoming() {
-            Ok(Some(stream)) => new_connection(stream),
+        match incoming() {
+            Ok(Some(stream)) => {
+                // wait the thread counter
+                if let Some(max_threads) = config.max_threads {
+                    unsafe {
+                        loop {
+                            if THREAD_COUNT < max_threads as isize {
+                                break
+                            }
+                            thread::yield_now();
+                        }
+                    }
+                }
+
+                unsafe {
+                    THREAD_COUNT += 1;
+                }
+                if thread::Builder::new()
+                    .spawn(move || {
+                        respond_http_request(stream);
+                        unsafe { THREAD_COUNT -= 1; }
+                    })
+                    .is_err()
+                {
+                    return Err(String::from("ERROR: Unable to spawn new threads."));
+                }
+            },
             Ok(None) => return Ok(()),
             Err(msg) => return Err(msg),
         };
