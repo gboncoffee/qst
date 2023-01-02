@@ -92,7 +92,7 @@ impl HttpRequest {
     /// If the path is impossible or insecure in a Linux system (i.e., contains "..", "//", or ends
     /// with "/"), returns Err with a proper response to that.
     ///
-    /// If the fetch is `/`, returns `./index.html`.
+    /// If the fetch is `/`, returns `default`.
     ///
     /// # Examples:
     /// ```
