@@ -107,6 +107,30 @@ impl HttpRequest {
         if self.fetch == "/" {
             Ok(format!("./{default}"))
 
+        } else if self.fetch == "//coffee" {
+            let content = String::from("\
+<!DOCTYPE html>
+<html lang=\"en\">
+    <head>
+        <meta charset=\"utf-8\">
+        <title>QST Teapots Inc.</title>
+    </head>
+
+    <body>
+        <h1>418 - I'm a Teapot</h1>
+        <p>
+        The server refuses to brew coffee because it is a teapot.
+        </p>
+    </body>
+</html>
+");
+            let content_len = content.len();
+            Err(HttpResponse {
+                code: HttpResponseCode::ImATeapot418,
+                content: Some(content),
+                content_length: Some(content_len),
+            })
+
         } else if 
             self.fetch.find("//").is_some() ||
             self.fetch.find("..").is_some() ||
