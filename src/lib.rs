@@ -6,10 +6,9 @@ use http::*;
 use std::io::Result as IoResult;
 use std::{
     fs,
-    thread,
-    process,
-    net::{TcpListener, TcpStream},
     io::Write,
+    net::{TcpListener, TcpStream},
+    process, thread,
 };
 
 static mut THREAD_COUNT: isize = 0;
@@ -21,7 +20,11 @@ fn write_tcp_or_bail_out(mut stream: TcpStream, string: String) {
     });
 }
 
-pub fn respond_http_request(mut stream: TcpStream, default_file: String, err404_file: Option<String>) {
+pub fn respond_http_request(
+    mut stream: TcpStream,
+    default_file: String,
+    err404_file: Option<String>,
+) {
     match HttpRequest::parse_tcp_stream(&mut stream) {
         Ok(request) => {
             match request.match_fetch(&default_file[..]) {
@@ -30,22 +33,30 @@ pub fn respond_http_request(mut stream: TcpStream, default_file: String, err404_
                     count.next().unwrap(); // will never panic as fetch is always ./<stuff>
                     count.next().unwrap();
                     if count.next().unwrap() == '_' {
-                        write_tcp_or_bail_out(stream, HttpResponse {
-                            code: HttpResponseCode::Forbbiden403,
-                            content: None,
-                            content_length: None,
-                        }.to_string());
+                        write_tcp_or_bail_out(
+                            stream,
+                            HttpResponse {
+                                code: HttpResponseCode::Forbbiden403,
+                                content: None,
+                                content_length: None,
+                            }
+                            .to_string(),
+                        );
                         return;
                     }
 
                     // actually read the file and send it
                     if let IoResult::Ok(content) = fs::read_to_string(fetch) {
                         let len = content.len();
-                        write_tcp_or_bail_out(stream, HttpResponse {
-                            code: HttpResponseCode::OK200,
-                            content: Some(content),
-                            content_length: Some(len),
-                        }.to_string());
+                        write_tcp_or_bail_out(
+                            stream,
+                            HttpResponse {
+                                code: HttpResponseCode::OK200,
+                                content: Some(content),
+                                content_length: Some(len),
+                            }
+                            .to_string(),
+                        );
                     } else {
                         let (content, length) = match err404_file {
                             // if the file is valid, uses it, else fails silently
@@ -56,19 +67,23 @@ pub fn respond_http_request(mut stream: TcpStream, default_file: String, err404_
                                 } else {
                                     (None, None)
                                 }
-                            },
+                            }
                             None => (None, None),
                         };
-                        write_tcp_or_bail_out(stream, HttpResponse {
-                            code: HttpResponseCode::NotFound404,
-                            content: content,
-                            content_length: length,
-                        }.to_string());
+                        write_tcp_or_bail_out(
+                            stream,
+                            HttpResponse {
+                                code: HttpResponseCode::NotFound404,
+                                content,
+                                content_length: length,
+                            }
+                            .to_string(),
+                        );
                     }
-                },
+                }
                 Err(response) => write_tcp_or_bail_out(stream, response.to_string()),
             }
-        },
+        }
         Err(response) => write_tcp_or_bail_out(stream, response.to_string()),
     }
 }
@@ -103,8 +118,8 @@ pub fn respond_http_request(mut stream: TcpStream, default_file: String, err404_
 /// });
 /// ```
 pub fn serve<F>(config: Config, mut incoming: F) -> Result<(), String>
-    where
-        F: FnMut() -> Result<Option<TcpStream>, String>,
+where
+    F: FnMut() -> Result<Option<TcpStream>, String>,
 {
     loop {
         match incoming() {
@@ -114,7 +129,7 @@ pub fn serve<F>(config: Config, mut incoming: F) -> Result<(), String>
                     unsafe {
                         loop {
                             if THREAD_COUNT < max_threads as isize {
-                                break
+                                break;
                             }
                             thread::yield_now();
                         }
@@ -134,13 +149,15 @@ pub fn serve<F>(config: Config, mut incoming: F) -> Result<(), String>
                 if thread::Builder::new()
                     .spawn(move || {
                         respond_http_request(stream, default_file, err404_file);
-                        unsafe { THREAD_COUNT -= 1; }
+                        unsafe {
+                            THREAD_COUNT -= 1;
+                        }
                     })
                     .is_err()
                 {
                     return Err(String::from("ERROR: Unable to spawn new threads."));
                 }
-            },
+            }
             Ok(None) => return Ok(()),
             Err(msg) => return Err(msg),
         };
@@ -149,7 +166,6 @@ pub fn serve<F>(config: Config, mut incoming: F) -> Result<(), String>
 
 /// Starts a server with a config. Returns Err(String) in case of error.
 pub fn start_server(config: Config) -> Result<(), String> {
-
     let full_addr = format!("{}:{}", config.addr, config.port);
 
     let listener = match TcpListener::bind(full_addr) {
@@ -158,22 +174,19 @@ pub fn start_server(config: Config) -> Result<(), String> {
             // full_addr was moved to TcpListener::bind
             let msg = format!("Unable to bind to {}:{}: {msg}", config.addr, config.port);
             return Err(msg);
-        },
+        }
     };
 
     println!(
         "Serving HTTP on {} port {} (http://{}:{})...",
-        config.addr,
-        config.port,
-        config.addr,
-        config.port
+        config.addr, config.port, config.addr, config.port
     );
 
     let mut iter = listener.incoming();
     if let Some(limit) = config.limit_requests {
         let mut count = 0;
         serve(config, move || {
-            if count <= limit {
+            if count < limit {
                 count += 1;
                 match iter.next() {
                     Some(result_stream) => match result_stream {
@@ -187,25 +200,23 @@ pub fn start_server(config: Config) -> Result<(), String> {
             }
         })
     } else {
-        serve(config, move || {
-            match iter.next() {
-                Some(result_stream) => match result_stream {
-                    Err(_) => Err(String::from("Connection failed. Bailing out.")),
-                    Ok(stream) => Ok(Some(stream)),
-                },
-                None => Ok(None),
-            }
+        serve(config, move || match iter.next() {
+            Some(result_stream) => match result_stream {
+                Err(_) => Err(String::from("Connection failed. Bailing out.")),
+                Ok(stream) => Ok(Some(stream)),
+            },
+            None => Ok(None),
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    
+
     use super::*;
     use std::time::Duration;
     use std::{sync::mpsc, thread};
-    
+
     #[test]
     fn server_starts_and_quit_with_limit_0() {
         let mut config = Config::new();
@@ -223,10 +234,11 @@ mod tests {
         for _ in 0..1000 {
             thread::sleep(Duration::from_millis(5));
             match rx.try_recv() {
-                Ok(Ok(_)) => break,
+                Ok(Ok(_)) => return,
                 Ok(Err(msg)) => panic!("Server crashed with message {msg}."),
-                Err(_) => panic!("Server did not stop within the 5 second timeout."),
+                Err(_) => {}
             };
         }
+        panic!("Server did not stop within the 5 second timeout.")
     }
 }
