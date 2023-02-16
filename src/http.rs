@@ -1,16 +1,14 @@
-use std::net::TcpStream;
-use std::io::{BufReader, BufRead};
 use std::io::Result as IoResult;
+use std::io::{BufRead, BufReader};
+use std::net::TcpStream;
 
-#[derive(Debug)]
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum HttpMethod {
     GET,
     HEAD,
 }
 
-#[derive(Debug)]
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum HttpResponseCode {
     Continue100,
     OK200,
@@ -26,33 +24,32 @@ pub enum HttpResponseCode {
 impl ToString for HttpResponseCode {
     fn to_string(&self) -> String {
         match self {
-            HttpResponseCode::Continue100                      => String::from("100 Continue"),
-            HttpResponseCode::OK200                            => String::from("200 Ok"),
-            HttpResponseCode::BadRequest400                    => String::from("400 Bad Request"),
-            HttpResponseCode::Forbbiden403                     => String::from("403 Forbidden"),
-            HttpResponseCode::NotFound404                      => String::from("404 Not Found"),
-            HttpResponseCode::MethodNotAllowed405              => String::from("405 Method Not Allowed"),
-            HttpResponseCode::ImATeapot418                     => String::from("418 I'm A Teapot"),
-            HttpResponseCode::NotImplemented501                => String::from("501 Not Implemented"),
-            HttpResponseCode::HttpVersionNotSupported505       => String::from("505 HTTP Version Not Supported"),
+            HttpResponseCode::Continue100 => String::from("100 Continue"),
+            HttpResponseCode::OK200 => String::from("200 Ok"),
+            HttpResponseCode::BadRequest400 => String::from("400 Bad Request"),
+            HttpResponseCode::Forbbiden403 => String::from("403 Forbidden"),
+            HttpResponseCode::NotFound404 => String::from("404 Not Found"),
+            HttpResponseCode::MethodNotAllowed405 => String::from("405 Method Not Allowed"),
+            HttpResponseCode::ImATeapot418 => String::from("418 I'm A Teapot"),
+            HttpResponseCode::NotImplemented501 => String::from("501 Not Implemented"),
+            HttpResponseCode::HttpVersionNotSupported505 => {
+                String::from("505 HTTP Version Not Supported")
+            }
         }
     }
 }
 
-#[derive(Debug)]
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct HttpRequest {
     pub method: HttpMethod,
     pub fetch: String,
 }
 
 impl HttpRequest {
-
-    pub fn parse_from_lines_iterator<F>(mut iter: F) -> Result<HttpRequest, HttpResponse> 
-        where 
-            F: Iterator<Item = IoResult<String>>,
+    pub fn parse_from_lines_iterator<F>(mut iter: F) -> Result<HttpRequest, HttpResponse>
+    where
+        F: Iterator<Item = IoResult<String>>,
     {
-
         let (method, fetch) = if let Some(Ok(line)) = iter.next() {
             let mut line_iter = line.split_ascii_whitespace();
             if let Some(method) = line_iter.next() {
@@ -71,11 +68,13 @@ impl HttpRequest {
         let method = match &method[..] {
             "GET" => HttpMethod::GET,
             "HEAD" => HttpMethod::HEAD,
-            _ => return Err(HttpResponse {
-                code: HttpResponseCode::NotImplemented501,
-                content: None,
-                content_length: None,
-            }),
+            _ => {
+                return Err(HttpResponse {
+                    code: HttpResponseCode::NotImplemented501,
+                    content: None,
+                    content_length: None,
+                })
+            }
         };
         let fetch = fetch.to_string();
         Ok(HttpRequest { method, fetch })
@@ -106,9 +105,9 @@ impl HttpRequest {
     pub fn match_fetch(&self, default: &str) -> Result<String, HttpResponse> {
         if self.fetch == "/" {
             Ok(format!("./{default}"))
-
         } else if self.fetch == "//coffee" {
-            let content = String::from("\
+            let content = String::from(
+                "\
 <!DOCTYPE html>
 <html lang=\"en\">
     <head>
@@ -123,37 +122,35 @@ impl HttpRequest {
         </p>
     </body>
 </html>
-");
+",
+            );
             let content_len = content.len();
             Err(HttpResponse {
                 code: HttpResponseCode::ImATeapot418,
                 content: Some(content),
                 content_length: Some(content_len),
             })
-
-        } else if 
-            self.fetch.find("//").is_some() ||
-            self.fetch.find("..").is_some() ||
-            self.fetch.ends_with('/')
+        } else if self.fetch.find("//").is_some()
+            || self.fetch.find("..").is_some()
+            || self.fetch.ends_with('/')
         {
             Err(HttpResponse {
                 code: HttpResponseCode::Forbbiden403,
                 content: None,
                 content_length: None,
             })
-
         } else {
-            if self.fetch.starts_with('/') {
-                Ok(format!(".{}", self.fetch))
+            let fetch = self.fetch.replace("%20", " ");
+            if fetch.starts_with('/') {
+                Ok(format!(".{}", fetch))
             } else {
-                Ok(format!("./{}", self.fetch))
+                Ok(format!("./{}", fetch))
             }
         }
     }
 }
 
-#[derive(Debug)]
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct HttpResponse {
     pub code: HttpResponseCode,
     pub content: Option<String>,
@@ -203,55 +200,57 @@ mod tests {
 
     #[test]
     fn parser_returns_request_on_valid() {
-        let request = vec![
-            IoResult::Ok(String::from("GET / HTTP/1.1")),
-        ];
+        let request = vec![IoResult::Ok(String::from("GET / HTTP/1.1"))];
         let response = HttpRequest::parse_from_lines_iterator(request.into_iter()).unwrap();
-        assert_eq!(response, HttpRequest {
-            method: HttpMethod::GET,
-            fetch: String::from("/"),
-        });
+        assert_eq!(
+            response,
+            HttpRequest {
+                method: HttpMethod::GET,
+                fetch: String::from("/"),
+            }
+        );
 
-        let request = vec![
-            IoResult::Ok(String::from("GET /index.html")),
-        ];
+        let request = vec![IoResult::Ok(String::from("GET /index.html"))];
         let response = HttpRequest::parse_from_lines_iterator(request.into_iter()).unwrap();
-        assert_eq!(response, HttpRequest {
-            method: HttpMethod::GET,
-            fetch: String::from("/index.html"),
-        });
+        assert_eq!(
+            response,
+            HttpRequest {
+                method: HttpMethod::GET,
+                fetch: String::from("/index.html"),
+            }
+        );
 
         let request = vec![
             IoResult::Ok(String::from("GET / HTTP/1.0")),
             IoResult::Ok(String::from("Host: pudim.com.br")),
         ];
         let response = HttpRequest::parse_from_lines_iterator(request.into_iter()).unwrap();
-        assert_eq!(response, HttpRequest {
-            method: HttpMethod::GET,
-            fetch: String::from("/"),
-        });
+        assert_eq!(
+            response,
+            HttpRequest {
+                method: HttpMethod::GET,
+                fetch: String::from("/"),
+            }
+        );
 
-        let request = vec![
-            IoResult::Ok(String::from("HEAD /index.html")),
-        ];
+        let request = vec![IoResult::Ok(String::from("HEAD /index.html"))];
         let response = HttpRequest::parse_from_lines_iterator(request.into_iter()).unwrap();
-        assert_eq!(response, HttpRequest {
-            method: HttpMethod::HEAD,
-            fetch: String::from("/index.html"),
-        });
+        assert_eq!(
+            response,
+            HttpRequest {
+                method: HttpMethod::HEAD,
+                fetch: String::from("/index.html"),
+            }
+        );
     }
 
     #[test]
     fn parser_returns_bad_request_on_invalid() {
-        let request = vec![
-            IoResult::Ok(String::from("GET")),
-        ];
+        let request = vec![IoResult::Ok(String::from("GET"))];
         let response = HttpRequest::parse_from_lines_iterator(request.into_iter()).unwrap_err();
         assert_eq!(HttpResponse::bad_request_400(), response);
 
-        let request = vec![
-            IoResult::Ok(String::from("")),
-        ];
+        let request = vec![IoResult::Ok(String::from(""))];
         let response = HttpRequest::parse_from_lines_iterator(request.into_iter()).unwrap_err();
         assert_eq!(HttpResponse::bad_request_400(), response);
 
@@ -262,15 +261,16 @@ mod tests {
 
     #[test]
     fn parser_returns_not_implemented_on_methods() {
-        let request = vec![
-            IoResult::Ok(String::from("POST / HTTP/1.1")),
-        ];
+        let request = vec![IoResult::Ok(String::from("POST / HTTP/1.1"))];
         let response = HttpRequest::parse_from_lines_iterator(request.into_iter()).unwrap_err();
-        assert_eq!(response, HttpResponse {
-            code: HttpResponseCode::NotImplemented501,
-            content: None,
-            content_length: None,
-        });
+        assert_eq!(
+            response,
+            HttpResponse {
+                code: HttpResponseCode::NotImplemented501,
+                content: None,
+                content_length: None,
+            }
+        );
     }
 
     #[test]
@@ -301,7 +301,10 @@ mod tests {
             content_length: Some(content.len()),
         };
 
-        assert_eq!(response.to_string(), String::from("\
+        assert_eq!(
+            response.to_string(),
+            String::from(
+                "\
 HTTP/1.1 200 Ok\r
 Content-Length: 99\r
 \r
@@ -315,7 +318,9 @@ Content-Length: 99\r
 </html>
 \r
 \r
-"));
+"
+            )
+        );
     }
 
     #[test]
@@ -331,13 +336,22 @@ Content-Length: 99\r
             fetch: String::from("/"),
         };
 
-        assert_eq!(Ok(String::from("./index.html")), request.match_fetch("index.html"));
+        assert_eq!(
+            Ok(String::from("./index.html")),
+            request.match_fetch("index.html")
+        );
 
         request.fetch = String::from("/test.js");
-        assert_eq!(Ok(String::from("./test.js")), request.match_fetch("index.html"));
+        assert_eq!(
+            Ok(String::from("./test.js")),
+            request.match_fetch("index.html")
+        );
 
         request.fetch = String::from("stuff.css");
-        assert_eq!(Ok(String::from("./stuff.css")), request.match_fetch("index.html"));
+        assert_eq!(
+            Ok(String::from("./stuff.css")),
+            request.match_fetch("index.html")
+        );
 
         request.fetch = String::from("../not_allow.png");
         assert_eq!(forbidden_res, request.match_fetch("index.html"));
