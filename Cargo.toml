@@ -1,6 +1,6 @@
 [package]
 name = "qst"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2021"
 description = "Quick Serve This: Simple serve meant for development."
 license = "MIT"
