@@ -2,7 +2,7 @@
 name = "qst"
 version = "1.0.3"
 edition = "2021"
-description = "Quick Serve This: Simple serve meant for development."
+description = "Quick Serve This: Simple server meant for development."
 license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
