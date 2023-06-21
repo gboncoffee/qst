@@ -1,3 +1,7 @@
+My simple http server. Archived as I don't want to fix missing stuff for it. For
+example, it failed to work with images sometimes and it does not parses the urls
+correctly (for example, urls with spaces ' ').
+
 # Quick Serve This
 
 QST is a extremelly simple web server designed for serving static pages with an
